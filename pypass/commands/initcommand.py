@@ -75,9 +75,9 @@ class InitCommand( CommandInterface ):
 						print( ' done' )
 					else:
 						print( ' not needed' )
-			except RuntimeError:
+			except RuntimeError as e:
 				print( ' failure' )
-				pass
+				print( 'Failed to encrypt file %s' % ( e ) )
 
 		container.walk( reencryptCallback )
 

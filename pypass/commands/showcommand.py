@@ -17,6 +17,7 @@ class ShowCommand( EntryCommand ):
 		super().buildParser( parser )
 
 		parser.add_argument( '--clip', '-c', action='store_true' )
+		parser.add_argument( '--password', '-p', action='store_true' )
 		parser.add_argument( '--no-verify', action='store_true' )
 		parser.add_argument( '-q', '--quiet', action='store_true' )
 
@@ -67,6 +68,8 @@ class ShowCommand( EntryCommand ):
 		if args.clip:
 			password = entry.password
 			return self.clip( password )
+		elif args.password:
+			print( entry.password )
 		elif args.yaml:
 			def recursiveDict( source, path ):
 				(head, sep, tail) = path.partition( '.' )
