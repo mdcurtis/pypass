@@ -1,25 +1,44 @@
 import os.path
+import re
 
 class Repository( object ):
 	baseDir = None
+	slashes = re.compile( r'[\\/]+')
 
 	def __init__( self, baseDir ):
 		self.baseDir = baseDir
 
-	def buildPath( self, path ):
+	def canonicalise( self, *args ):
+		# UNIX-style path names
+		components = [ self.slashes.sub( '/', component ) for component in args ]
+
+		startComponent = 0
+		for idx in range( 0, len( components ) ):
+			if components[ idx ].startswith( '/' ):
+				startComponent = idx
+
+		components = components[ startComponent: ]
+		canon = '/'.join( components )
+
+		return self.slashes.sub( '/', canon )
+
+
+	def buildPath( self, path, *args ):
 		# Treat absolute paths as relative to baseDir, not the system
 		if path.startswith( '/' ) or path.startswith( '\\' ):
 			path = path[ 1: ]
 		realPath = os.path.normpath( os.path.join( self.baseDir, path ) )
-		
+
 		if os.path.commonprefix( [ self.baseDir, realPath ] ) == self.baseDir:
 			return realPath
 		else:
 			return None
 
 	def checkPath( self, path ):
-		if self.buildPath( path ) is None:
+		fullPath = self.buildPath( path ) 
+		if fullPath is None:
 			raise RuntimeError( "Bad path '%s'!" % (path ) )
+		return fullPath
 
 	def findFile( self, path, fileName ):
 		self.checkPath( path )

@@ -1,4 +1,4 @@
-from pypass.commands  import CommandInterface
+from pypass.commands  import EntryCommand
 
 from pypass import PasswordEntry
 
@@ -8,17 +8,19 @@ import sys
 from datetime import datetime
 import time
 
-class ShowCommand( CommandInterface ):
+class ShowCommand( EntryCommand ):
 	name = 'show'
 	help = 'Show (or send to clipboard) the password stored in ENTRY'
+	requires = [ PasswordEntry ]
 
 	def buildParser( self, parser ):
 		super().buildParser( parser )
 
-		parser.add_argument( 'entry', metavar='ENTRY' )
 		parser.add_argument( '--clip', '-c', action='store_true' )
 		parser.add_argument( '--no-verify', action='store_true' )
 		parser.add_argument( '-q', '--quiet', action='store_true' )
+
+		parser.add_argument( '-y', '--yaml' )
 	
 	def clip( self, password ):
 		try:
@@ -40,34 +42,50 @@ class ShowCommand( CommandInterface ):
 		return True
 
 
-	def execute( self, args, gpg ):
-		entry = PasswordEntry( self.repository, args.entry )
+	def executeEntry( self, args, entry ):
 
-		if not entry.exists:
+		if not entry.exists():
 			print( 'No such entry: %s' % ( entry.name ) )
 			return False
 
-		entryFile = open( entry.fullPath, 'rb' )
-		decrypted_data = gpg.decrypt_file( entryFile, not args.no_verify )
-		entryFile.close()
-
-		if decrypted_data.username is None:
+		entry.load()
+		
+		if entry.signature is None:
 			if not args.no_verify:
 				print( 'Error: password is not signed. Authenticity cannot be validated!', file=sys.stderr )
 				print( ' Skip this check with --no-verify', file=sys.stderr )
 				return False
 		
-		if not args.quiet and decrypted_data.username is not None:
+		if not args.quiet and entry.signature.username is not None:
 			print( '---- Signed Password ----', file=sys.stderr )
-			print( 'Signed by:  %s' % ( decrypted_data.username ), file=sys.stderr )
-			print( 'Sign key:   %s' % ( decrypted_data.pubkey_fingerprint ), file=sys.stderr )
-			print( 'Signed on:  %s' % ( datetime.fromtimestamp( int(decrypted_data.sig_timestamp ) ) ), file=sys.stderr )
-			print( 'Trusted:    %s' % ( decrypted_data.trust_level ), file=sys.stderr )
+			print( 'Signed by:  %s' % ( entry.signature.username ), file=sys.stderr )
+			print( 'Sign key:   %s' % ( entry.signature.pubkey_fingerprint ), file=sys.stderr )
+			print( 'Signed on:  %s' % ( entry.signature.sig_timestamp ), file=sys.stderr )
+			print( 'Trusted:    %s' % ( entry.signature.trust_level ), file=sys.stderr )
 			print( '-------------------------', file=sys.stderr )
 
 		if args.clip:
-			password = str( decrypted_data ).split( '\n' )[ 0 ]
+			password = entry.password
 			return self.clip( password )
+		elif args.yaml:
+			def recursiveDict( source, path ):
+				(head, sep, tail) = path.partition( '.' )
+				lNames = [ s.lower() for s in source.keys() ]
+				names = [ s for s in source.keys() ]
+				if head.lower() in lNames:
+					properName = names[ lNames.index( head.lower() ) ]
+					entry = source[ properName ]
+					if len( tail ) and isinstance( entry, dict ):
+						return recursiveDict( entry, tail )
+					elif len( tail ) and isinstance( entry, list ):
+						for subentry in entry:
+							result = recursiveDict( subentry, tail )
+							if result is not None: return result
+					elif len( tail ) == 0:
+						return entry
+				return None
+
+			print( recursiveDict( entry.extraData, args.yaml ) )
 		else:
-			print( decrypted_data )
+			print( entry.data )
 			return True

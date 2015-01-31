@@ -1,29 +1,20 @@
 
 from datetime import datetime
 
+from pypass import GPGDictWrapper
+
 import re
 keyIdRegex = re.compile( '^[0-9A-Za-z]{8,16}$' )
 emailRegex = re.compile( '<(.+@.+)>')
 
-class KeyInfo( object ):
-	def __init__( self, keyData ):
-		self.keyData = keyData
-
-	def __getattr__( self, name ):
-		return self.keyData[ name ]
-
-	def _getTimestamp( self, name ):
-		if not name in self.keyData:
-			return None
-		if self.keyData[ name ] == '':
-			return None
-
-		return datetime.fromtimestamp( int( self.keyData[ name ] ) )
+class KeyInfo( GPGDictWrapper ):
+	def __init__( self, data ):
+		super().__init__( data )
 
 	@property
 	def emails( self ):
 		result = []
-		for uid in self.keyData[ 'uids' ]:
+		for uid in self.uids:
 			regexResult = emailRegex.search( uid )
 			if regexResult is not None:
 				result.append( regexResult.groups()[ 0 ] )

@@ -2,6 +2,8 @@ import gnupg
 import sys
 import os.path
 
+from pypass import KeyDatabase
+
 def findInPath( paths, name ):
 	for path in paths:
 		fullPath = os.path.join( path, name )
@@ -74,6 +76,8 @@ class EncryptionKeys( object ):
 
 
 class ExtendedGPG( gnupg.GPG ):
+	_keyDB = None
+
 	def __init__( self, *args, **kwargs ):
 		discoveredBinary = None
 		if sys.platform.startswith( 'win32' ):
@@ -88,6 +92,10 @@ class ExtendedGPG( gnupg.GPG ):
 		kwargs[ 'gpgbinary' ] = discoveredBinary
 		super().__init__( *args, **kwargs )
 
+	def keyDB( self ):
+		if not self._keyDB:
+			self._keyDB = KeyDatabase( self )
+		return self._keyDB
 
 	def list_encryption_keys( self, file, passphrase=None ):
 		gpgargs = [ '--decrypt',  '--list-only', '--keyid-format', 'long' ]
@@ -95,7 +103,7 @@ class ExtendedGPG( gnupg.GPG ):
 		result = EncryptionKeys( self )
 		self._handle_io( gpgargs, file, result, passphrase=passphrase, binary=True )
 		
-		return result
+		return result.key_ids
 
 	def versionStr( self ):
 		return ".".join( str( i ) for i in self.version )

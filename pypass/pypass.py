@@ -9,7 +9,7 @@ import gnupg
 import argparse
 
 import pypass.commands
-from pypass import Repository
+from pypass import Repository, Container
 from pypass import ExtendedGPG
 
 def verTupleToStr( verTuple ):
@@ -19,9 +19,11 @@ def verTupleToStr( verTuple ):
 	return '.'.join( numbers )
 
 def main_entry():
-	repository = Repository( os.getcwd() )
-
 	gpg = ExtendedGPG( use_agent=True )
+
+	# Initialise the repository
+	repository = Repository( os.getcwd() )
+	root = Container( '/', repository, gpg )
 
 	parser = argparse.ArgumentParser(description='GPG-based password management.')
 
@@ -42,7 +44,7 @@ def main_entry():
 		sys.exit()
 
 	if 'func' in args:
-		args.func( args, gpg )
+		args.func( args, root )
 	else:
 		parser.print_usage()
 		parser.exit()

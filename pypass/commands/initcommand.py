@@ -1,5 +1,7 @@
 from pypass.commands import CommandInterface
 
+from pypass import PasswordEntry, Container
+
 import sys
 import os
 import os.path
@@ -17,9 +19,8 @@ class InitCommand( CommandInterface ):
 
 		super().buildParser( parser )
 
-	def execute( self, args, gpg ):
-		keyDB = KeyDatabase( gpg )
-		keys = keyDB.findKeys( args.gpgIds )
+	def execute( self, args, root ):
+		keys = root.gpg.keyDB().findKeys( args.gpgIds )
 
 		havePrivate = False
 		for key in keys:
@@ -63,4 +64,20 @@ class InitCommand( CommandInterface ):
 		self.repository.notifyAdd( gpgIdPath, 'Set GPG id to %s' % ( ', '.join( keyIds ) ) )
 		print( "Password store initialized for %s" % ( ', '.join( keyIds ) ) )
 
-		# Re-encrypt stuff...
+		print( 'Re-encrypting entries as necessary...' )
+		container = root.findEntry( args.path )
+		signature = container.signingKey()
+		def reencryptCallback( entry, level ):
+			try:
+				if isinstance( entry, PasswordEntry ):
+					print( 'Re-encrypting ' + entry.name, end='', flush=True )
+					if entry.reencrypt( signature ):
+						print( ' done' )
+					else:
+						print( ' not needed' )
+			except RuntimeError:
+				print( ' failure' )
+				pass
+
+		container.walk( reencryptCallback )
+

@@ -1,9 +1,12 @@
-from pypass.recipients import Recipients
 from pypass.repository import Repository
+
+from pypass.gpgdictwrapper import GPGDictWrapper
 from pypass.keylist import KeyDatabase, KeyInfo
-from pypass.entry import Container, PasswordEntry
+from pypass.signature import Signature
 
 from pypass.extendedgpg import ExtendedGPG, EncryptionKeys
+
+from pypass.entry import Container, PasswordEntry
 
 import pypass.util
 
