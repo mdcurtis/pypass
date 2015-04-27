@@ -1,6 +1,8 @@
 import os.path
+import io
 
 from pypass import Repository, ExtendedGPG, Signature
+from pypass import uri
 import gnupg
 
 import yaml
@@ -8,7 +10,6 @@ import yaml
 class Entry( object ):
 	_haveParent = False
 	_parentCache = None
-	_fullPath = None
 
 	def __init__( self, path, *args ):
 		parent = None
@@ -23,22 +24,15 @@ class Entry( object ):
 				self.gpg = arg
 		
 		if parent is not None:
-			self.path = self.repository.canonicalise( parent.path, path )
+			self.path = uri.join( parent.path, path )
 		else:
 			self.path = path
 
-		self.repository.checkPath( path )
 		self.name = path
 		
 
 	def exists( self ):
-		return os.path.exists( self.fullPath )
-
-	@property
-	def fullPath( self ):
-		if self._fullPath is None:
-			self._fullPath = self.repository.buildPath( self.path )
-		return self._fullPath
+		return self.repository.exists( self.path )
 
 	def name( self ):
 		return self.name
@@ -46,14 +40,14 @@ class Entry( object ):
 	@property
 	def parent( self ):
 		if not self._haveParent:
-			(head, tail) = os.path.split( self.path )
+			(head, tail) = uri.split( self.path )
 			if head == '':
 				if self.path == '/':
 					self._parentCache = None
 				else:
 					self._parentCache = Container( '/', self )
 			else:
-				self._parentCache = Container( head, self )
+				self._parentCache = Container( '/' + head, self )
 
 		return self._parentCache
 
@@ -61,25 +55,26 @@ class Container( Entry ):
 	def __init__( self, path = '/', *args ):
 		super().__init__( path, *args )
 
-		if not os.path.isdir( self.repository.buildPath( self.path ) ):
+		if not self.repository.isDir( self.path ):
 			raise RuntimeError( '%s: is not a valid container' % ( self.path ) )
 
-		self.gpgIdPath = self.repository.buildPath( os.path.join( self.path, '.gpg-id' ) )
+		self.gpgIdPath = uri.join( self.path, '.gpg-id' )
 		self._recipients = None
 
 	def hasOverride( self ):
-		if self.gpgIdPath:
+		if self.repository.exists( self.gpgIdPath ):
 			return True
 		return False
 
 	def children( self ):
-		items = os.listdir( self.fullPath )
+		fullPath = self.repository._path( self.path )
+		items = os.listdir( fullPath )
 
 		childList = []
 		for item in items:
 			if item.startswith( '.' ): continue
-			realPath = os.path.join( self.fullPath, item )
-			if os.path.isdir( realPath ):
+			fullURI = uri.join( self.path, item )
+			if self.repository.isDir( fullURI ):
 				childList.append( Container( item, self ) )
 			elif item.endswith( '.gpg' ):
 				childList.append( PasswordEntry( item, self ) )
@@ -87,20 +82,19 @@ class Container( Entry ):
 		return childList
 
 	def findEntry( self, path ):
-		childPath = self.repository.canonicalise( self.path, path )
+		childPath = uri.join( self.path, path )
 
-		realPath = self.repository.checkPath( childPath )
-		if os.path.isdir( realPath ):
-			return Container( childPath, self )
+		if self.repository.isDir( childPath ):
+			return Container( childPath, self.repository, self.gpg )
 		else:
-			return PasswordEntry( childPath, self )
+			return PasswordEntry( childPath, self.repository, self.gpg )
 
 	def defaultRecipients( self ):
-		if not os.path.exists( self.gpgIdPath ) and self.parent:
+		if not self.repository.exists( self.gpgIdPath ) and self.parent:
 			return self.parent.defaultRecipients()
 		elif self._recipients is None:
 			self._recipients = []
-			gpgIdFile = open( self.gpgIdPath, 'r' )
+			gpgIdFile = io.TextIOWrapper( self.repository.read( self.gpgIdPath ) )
 			lines = gpgIdFile.readlines()
 			for line in lines:
 				line = line.strip()
@@ -132,8 +126,8 @@ class Container( Entry ):
 
 
 class PasswordEntry( Entry ):
-	def __init__( self, path, *args ):
-		(name, ext) = os.path.splitext( path )
+	def __init__( self, uri, *args ):
+		(name, ext) = os.path.splitext( uri )
 		if ext.lower() != '.gpg':
 			ext += '.gpg'
 		
@@ -187,7 +181,7 @@ class PasswordEntry( Entry ):
 	
 
 	def load( self, verify = True ):
-		entryFile = open( self.fullPath, 'rb' )
+		entryFile = self.repository.read( self.path )
 		decrypted_data = self.gpg.decrypt_file( entryFile, verify )
 		entryFile.close()
 
@@ -220,7 +214,7 @@ class PasswordEntry( Entry ):
 
 
 	def recipients( self ):
-		entryFile = open( self.fullPath, 'rb' )
+		entryFile = self.repository.read( self.path )
 		keyIds = self.gpg.list_encryption_keys( entryFile )
 		entryFile.close()
 
@@ -229,15 +223,17 @@ class PasswordEntry( Entry ):
 	def save( self, signingKey ):
 		if self.needsSerialise:
 			# Take 'cooked' (password + YAML dict) and convert to a data stream
-			self._data = self.password + '\n' + yaml.dump( self._kvStore )
+			self._data = self.password
+			if self._kvStore is not None and len( self._kvStore ) > 0:
+				self._data += '\n' + yaml.dump( self._kvStore )
 
 			self.needsSerialise = False
 
 		encrypted = self.gpg.encrypt( self._data, self.parent.defaultRecipients(), sign=signingKey )
 		if encrypted.ok:
-			entryFile = open( self.fullPath, 'wb' )
+			entryFile = self.repository.write( self.path ) 
 			entryFile.write( str( encrypted ).encode() )
-			entryFile.close()
+			entryFile.commit()
 
 			return True
 		else:

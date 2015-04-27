@@ -14,13 +14,13 @@ class InitCommand( CommandInterface ):
 	repository = None
 
 	def buildParser( self, parser ):
-		parser.add_argument( 'gpgIds', metavar='GPG-ID', nargs='+' )
-		parser.add_argument( '-p', '--path', metavar='subfolder' )
+		parser.add_argument( '-r', '--recipients', metavar='GPG-ID', nargs='+' )
+		parser.add_argument( 'path', metavar='PATH' )
 
 		super().buildParser( parser )
 
 	def execute( self, args, root ):
-		keys = root.gpg.keyDB().findKeys( args.gpgIds )
+		keys = root.gpg.keyDB().findKeys( args.recipients )
 
 		havePrivate = False
 		for key in keys:
@@ -30,9 +30,6 @@ class InitCommand( CommandInterface ):
 		if not havePrivate:
 			print( "At least one key provided should have a private key available, otherwise you will not be able to decrypt the passwords. Aborting.")
 			sys.exit()
-
-		if args.path is None:
-			args.path = '.'
 
 		realPath = self.repository.buildPath( args.path )
 		if realPath is None:
@@ -47,7 +44,7 @@ class InitCommand( CommandInterface ):
 				print( "'%s' is a symlink!" % ( args.path ) )
 				sys.exit( 1 )
 		else:
-			os.mkdir( realPath )
+			os.makedirs( realPath )
 
 		keyIds = []
 		for key in keys:

@@ -62,7 +62,7 @@ class ShowCommand( EntryCommand ):
 			print( 'Signed by:  %s' % ( entry.signature.username ), file=sys.stderr )
 			print( 'Sign key:   %s' % ( entry.signature.pubkey_fingerprint ), file=sys.stderr )
 			print( 'Signed on:  %s' % ( entry.signature.sig_timestamp ), file=sys.stderr )
-			print( 'Trusted:    %s' % ( entry.signature.trust_level ), file=sys.stderr )
+			print( 'Trusted:    %s' % ( entry.signature.trust_text ), file=sys.stderr )
 			print( '-------------------------', file=sys.stderr )
 
 		if args.clip:

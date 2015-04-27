@@ -9,6 +9,7 @@ from pypass.extendedgpg import ExtendedGPG, EncryptionKeys
 from pypass.entry import Container, PasswordEntry
 
 import pypass.util
+import pypass.uri
 from pypass.generator import PasswordGenerator
 
 from pypass.pypass import main_entry

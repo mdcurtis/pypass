@@ -34,6 +34,8 @@ class EditCommand( EntryCommand ):
 			newData = textBox.get( '1.0', tkinter.END )
 
 			if newData != entry.data:
+				entry.data = newData
+				
 				shouldSave[ 0 ] = True
 
 			root.destroy()
