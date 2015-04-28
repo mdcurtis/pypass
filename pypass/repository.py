@@ -96,12 +96,12 @@ class Repository( object ):
 		return find( path, fileName ) 
 
 	def notifyAdd( self, path, msg = None ):
-		self.buildPath( path )
+		#self.buildPath( path )
 
 		return True
 
 	def notifyDelete( self, path, msg = None ):
-		self.buildPath( path )
+		#self.buildPath( path )
 
 		return True
 

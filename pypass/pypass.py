@@ -82,7 +82,7 @@ def main_entry():
 
 	# for file based repositories, make the root entry based on the cwd...
 	if repository:
-		command.root = Container( os.path.relpath( os.getcwd(), repository.baseDir ) , repository, gpg )
+		command.root = Container( os.path.relpath( os.getcwd(), repository.baseDir ), repository, gpg )
 	command.repository = repository
 
 	command.execute( args )

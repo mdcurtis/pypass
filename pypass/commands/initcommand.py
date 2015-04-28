@@ -17,6 +17,7 @@
 from pypass.commands import CommandInterface
 
 from pypass import PasswordEntry, Container
+import pypass.uri as uri
 
 import sys
 import os
@@ -35,8 +36,8 @@ class InitCommand( CommandInterface ):
 
 		super().buildParser( parser )
 
-	def execute( self, args, root ):
-		keys = root.gpg.keyDB().findKeys( args.recipients )
+	def execute( self, args ):
+		keys = self.root.gpg.keyDB().findKeys( args.recipients )
 
 		havePrivate = False
 		for key in keys:
@@ -47,18 +48,17 @@ class InitCommand( CommandInterface ):
 			print( "At least one key provided should have a private key available, otherwise you will not be able to decrypt the passwords. Aborting.")
 			sys.exit()
 
-		realPath = self.repository.buildPath( args.path )
-		if realPath is None:
-			print( "'%s' is not a valid path within this repository" % ( args.path ) )
-			sys.exit( 1 )
+		pathUri = uri.join( args.path )
 
-		if os.path.exists( realPath ):
-			if not os.path.isdir( realPath ):
-				print( "'%s' is not a directory!" % ( args.path ) )
+		print( self.repository._path( pathUri ))
+
+		if self.repository.exists(pathUri ):
+			if not self.repository.isDir(  pathUri ):
+				print( "'%s' is not a directory!" % (pathUri ) )
 				sys.exit( 1 )
-			elif os.path.islink( realPath ):
-				print( "'%s' is a symlink!" % ( args.path ) )
-				sys.exit( 1 )
+			#else: #if os.path.islink( realPath ):
+			#	print( "'%s' is a symlink!" % ( pathUri ) )
+			#	sys.exit( 1 )
 		else:
 			os.makedirs( realPath )
 
@@ -67,19 +67,21 @@ class InitCommand( CommandInterface ):
 			keyIds += [ key.keyid ]
 
 		# Double-check that this isn't a no-op
-		gpgIdPath = os.path.join( args.path, '.gpg-id' )
+		gpgIdPath = uri.join( pathUri, '.gpg-id' )
+		gpgIdFile = self.repository.write( gpgIdPath )
+		#gpgIdPath = os.path.join( args.path, '.gpg-id' )
 
-		gpgIdFile = open( self.repository.buildPath( gpgIdPath ), 'w' )
 		for keyId in keyIds:
-			print( keyId, file=gpgIdFile )
-		gpgIdFile.close()
+			gpgIdFile.write( (keyId + '\n').encode() )
+		gpgIdFile.commit()
 
 		self.repository.notifyAdd( gpgIdPath, 'Set GPG id to %s' % ( ', '.join( keyIds ) ) )
 		print( "Password store initialized for %s" % ( ', '.join( keyIds ) ) )
 
 		print( 'Re-encrypting entries as necessary...' )
-		container = root.findEntry( args.path )
+		container = self.root.findEntry( args.path )
 		signature = container.signingKey()
+		print( 'signingKey is %s' % ( signature ) )
 		def reencryptCallback( entry, level ):
 			try:
 				if isinstance( entry, PasswordEntry ):

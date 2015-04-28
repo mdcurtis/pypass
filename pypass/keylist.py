@@ -104,7 +104,7 @@ class KeyDatabase( object ):
 			if len( private ):
 				return private
 			else:
-				return self_._indexSearch( self._public_cache, search )
+				return self._indexSearch( self._public_cache, search )
 		elif '@' in search:
 			for cache in [ self._private_cache, self._public_cache ]:
 				results = []
